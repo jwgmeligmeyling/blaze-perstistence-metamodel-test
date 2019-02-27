@@ -1,13 +1,12 @@
 package domain
 
-import javax.persistence.CascadeType
-import javax.persistence.Entity
-import javax.persistence.FetchType
-import javax.persistence.OneToOne
+import javax.persistence.*
 
 @Entity
 class Person(
         val name: String,
         @OneToOne(cascade = [(CascadeType.ALL)], orphanRemoval = true, fetch = FetchType.EAGER)
-        val address: Address
+        val address: Address,
+        @OneToMany(mappedBy = "owner")
+        val documents: Collection<Document>
 ) : AbstractJpaPersistable<Long>()

@@ -25,11 +25,17 @@
         </dependency>
         <dependency>
             <groupId>com.blazebit</groupId>
+            <artifactId>blaze-persistence-core-parser</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.blazebit</groupId>
             <artifactId>blaze-persistence-core-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.blazebit</groupId>
             <artifactId>blaze-persistence-core-impl</artifactId>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.blazebit</groupId>
