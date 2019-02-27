@@ -1,0 +1,13 @@
+*.iml
+*.ipr
+.idea/
+.gradle/
+build/
+target/
+/local.properties
+.DS_Store
+/captures
+.externalNativeBuild
+WorkspaceSettings.xcsettings
+*.xcuserstate
+*.log
