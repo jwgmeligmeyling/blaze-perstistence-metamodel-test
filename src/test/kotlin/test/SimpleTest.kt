@@ -2,10 +2,7 @@ package test
 
 import com.blazebit.persistence.Criteria
 import com.blazebit.persistence.CriteriaBuilderFactory
-import domain.Address
-import domain.Document
-import domain.Person
-import domain.QDocument
+import domain.*
 import org.hibernate.testing.junit4.BaseCoreFunctionalTestCase
 import org.junit.Test
 import domain.QPerson.person
@@ -116,6 +113,27 @@ class SimpleTest : BaseCoreFunctionalTestCase() {
         }
     }
 
+    @Test
+    fun doSomeMoreTests7() {
+        val result = doInJpa { entityManager ->
+            val ownedDocument = QDocument("ownedDocument")
+
+            cbf!!.create(entityManager, QPersonCte.personCte)
+                    .with(QPersonCte.personCte)
+                    .from(QPerson.person)
+                    .leftJoin(person.documents, ownedDocument)
+                    .where(QPerson.person.name.eq("dipshit"))
+                    .whereOr()
+                        .where(person.name).eq("test")
+                        .where(person.name).eqExpression(person.name)
+                    .endOr()
+                    .bind(QPersonCte.personCte.id).select(QPerson.person.id)
+                    .bind(QPersonCte.personCte.name).select(QPerson.person.name)
+                    .end()
+                    .resultList
+        }
+    }
+
 
 
     private fun <T> doInJpa(fn : (EntityManager) -> T) : T {
@@ -141,6 +159,6 @@ class SimpleTest : BaseCoreFunctionalTestCase() {
     }
 
     override fun getAnnotatedClasses(): Array<Class<*>> {
-        return arrayOf(Person::class.java, Address::class.java, Document::class.java)
+        return arrayOf(Person::class.java, Address::class.java, Document::class.java, PersonCte::class.java)
     }
 }

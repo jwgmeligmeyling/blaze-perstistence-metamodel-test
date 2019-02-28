@@ -6,6 +6,7 @@ import com.mysema.query.jpa.JPQLTemplates
 import com.mysema.query.types.*
 import com.mysema.query.types.Path
 import javax.persistence.EntityManager
+import kotlin.reflect.KClass
 
 /**
  * Creates a new criteria builder with the given result class. The result class will be used as default from class.
@@ -30,7 +31,7 @@ fun <T : Any> CriteriaBuilderFactory.create(entityManager : EntityManager, entit
  * @param alias The alias for the joined element
  * @return The query builder for chaining calls
  */
-fun <T, P> CriteriaBuilder<T>.innerJoin(path : CollectionExpression<*, P>, alias : Path<P>): CriteriaBuilder<T> {
+fun <T, A, P> T.innerJoin(path : CollectionExpression<*, P>, alias : Path<P>): A where T : FromBuilder<A>, A : ParameterHolder<*> {
     val aliasName = alias.metadata.name
     val (expression, parameters) = parseExpressionAndBindParameters(path)
     return innerJoin(expression, aliasName).setParameters(parameters)
@@ -43,7 +44,7 @@ fun <T, P> CriteriaBuilder<T>.innerJoin(path : CollectionExpression<*, P>, alias
  * @param alias The alias for the joined element
  * @return The query builder for chaining calls
  */
-fun <T, P> CriteriaBuilder<T>.leftJoin(path : CollectionExpression<*, P>, alias : Path<P>): CriteriaBuilder<T> {
+fun <T, A, P> T.leftJoin(path : CollectionExpression<*, P>, alias : Path<P>): A where T : FromBuilder<A>, A : ParameterHolder<*> {
     val aliasName = alias.metadata.name
     val (expression, parameters) = parseExpressionAndBindParameters(path)
     return leftJoin(expression, aliasName).setParameters(parameters)
@@ -56,7 +57,7 @@ fun <T, P> CriteriaBuilder<T>.leftJoin(path : CollectionExpression<*, P>, alias 
  * @param alias The alias for the joined element
  * @return The query builder for chaining calls
  */
-fun <T, P> CriteriaBuilder<T>.rightJoin(path : CollectionExpression<*, P>, alias : Path<P>): CriteriaBuilder<T> {
+fun <T, A, P> T.rightJoin(path : CollectionExpression<*, P>, alias : Path<P>): A where T : FromBuilder<A>, A : ParameterHolder<*> {
     val aliasName = alias.metadata.name
     val (expression, parameters) = parseExpressionAndBindParameters(path)
     return rightJoin(expression, aliasName).setParameters(parameters)
@@ -69,7 +70,7 @@ fun <T, P> CriteriaBuilder<T>.rightJoin(path : CollectionExpression<*, P>, alias
  * @param alias The alias for the joined element
  * @return The restriction builder for the on-clause
  */
-fun <T, P> CriteriaBuilder<T>.innerJoinOn(path : CollectionExpression<*, P>, alias : Path<P>): JoinOnBuilder<CriteriaBuilder<T>> {
+fun <T, A, P> T.innerJoinOn(path : CollectionExpression<*, P>, alias : Path<P>): JoinOnBuilder<A>  where T : FromBuilder<A>, A : ParameterHolder<*> {
     val aliasName = alias.metadata.name
     val expression = parseJPQLExpression(path)
     return innerJoinOn(expression, aliasName)
@@ -82,7 +83,7 @@ fun <T, P> CriteriaBuilder<T>.innerJoinOn(path : CollectionExpression<*, P>, ali
  * @param alias The alias for the joined element
  * @return The restriction builder for the on-clause
  */
-fun <T, P> CriteriaBuilder<T>.leftJoinOn(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): JoinOnBuilder<CriteriaBuilder<T>> {
+fun <T, A, P> T.leftJoinOn(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): JoinOnBuilder<A> where T : FromBuilder<A>, A : ParameterHolder<*> {
     val aliasName = entityPath.metadata.name
     val expression = parseJPQLExpression(collectionPath)
     return leftJoinOn(expression, aliasName)
@@ -95,10 +96,26 @@ fun <T, P> CriteriaBuilder<T>.leftJoinOn(collectionPath : CollectionExpression<*
  * @param alias The alias for the joined element
  * @return The restriction builder for the on-clause
  */
-fun <T, P> CriteriaBuilder<T>.rightJoinOn(path : CollectionExpression<*, P>, alias : Path<P>): JoinOnBuilder<CriteriaBuilder<T>> {
+fun <T, A, P> T.rightJoinOn(path : CollectionExpression<*, P>, alias : Path<P>): JoinOnBuilder<A> where T : FromBuilder<A>, A : ParameterHolder<*> {
     val aliasName = alias.metadata.name
     val expression = parseJPQLExpression(path)
     return rightJoinOn(expression, aliasName)
+}
+
+fun <T : CTEBuilder<T>> CTEBuilder<T>.with(cteClass : KClass<*>) : FullSelectCTECriteriaBuilder<T> {
+    return with(cteClass.java)
+}
+
+fun <T : CTEBuilder<T>> CTEBuilder<T>.with(entityPath: EntityPath<*>) : FullSelectCTECriteriaBuilder<T> {
+    val entityType : Class<*> = entityPath.annotatedElement as Class<*>
+    return with(entityType)
+}
+
+fun <T> FullSelectCTECriteriaBuilder<T>.bind(path : Path<*>) : SelectBuilder<FullSelectCTECriteriaBuilder<T>> {
+    val expression = parseJPQLExpression(path)
+    val alias = generateSequence(path) { elem -> elem.metadata.parent }.last().metadata.name
+    val unqualifiedExpression = expression.substring(alias.length + 1)
+    return bind(unqualifiedExpression)
 }
 
 fun <T : CriteriaBuilder<*>> JoinOnBuilder<T>.on(predicate: Predicate) : T {
@@ -127,7 +144,7 @@ fun <T : CriteriaBuilder<*>> JoinOnBuilder<T>.on(predicate: Predicate) : T {
  * @param expression The expression for the select clause
  * @return The query builder for chaining calls
  */
-fun <T> CriteriaBuilder<T>.select(expression: Expression<*>): CriteriaBuilder<T> {
+fun <T, A> T.select(expression: Expression<*>): A where T : SelectBuilder<A>, A : ParameterHolder<*> {
     val (expr, parameters) = parseExpressionAndBindParameters(expression)
     return select(expr).setParameters(parameters)
 }
@@ -139,7 +156,7 @@ fun <T> CriteriaBuilder<T>.select(expression: Expression<*>): CriteriaBuilder<T>
  * @param alias The alias for the expression
  * @return The query builder for chaining calls
  */
-fun <T> CriteriaBuilder<T>.select(expression: Expression<*>, alias: String): CriteriaBuilder<T> {
+fun <T, A> T.select(expression: Expression<*>, alias: String): A where T : SelectBuilder<A>, A : ParameterHolder<*> {
     val (expr, parameters) = parseExpressionAndBindParameters(expression)
     return select(expr, alias).setParameters(parameters)
 }
@@ -150,7 +167,7 @@ fun <T> CriteriaBuilder<T>.select(expression: Expression<*>, alias: String): Cri
  * @param predicate The where predicate
  * @return The builder
  */
-fun <A : CriteriaBuilder<T>, T> A.where(predicate : Predicate) : CriteriaBuilder<T> {
+fun <T, A> T.where(predicate : Predicate) : A where T : WhereBuilder<A>, A : ParameterHolder<*> {
     val (jpqlQueryFragment, parameters) = parseExpressionAndBindParameters(predicate)
     return setWhereExpression(jpqlQueryFragment).setParameters(parameters)
 }
@@ -161,7 +178,7 @@ fun <A : CriteriaBuilder<T>, T> A.where(predicate : Predicate) : CriteriaBuilder
  * @param entityPath The entity which should be queried
  * @return The query builder for chaining calls
  */
-fun <T> CriteriaBuilder<T>.from(entityPath : EntityPath<*>) : CriteriaBuilder<T> {
+fun <T : FromBuilder<T>> FromBuilder<T>.from(entityPath : EntityPath<*>) : T {
     val entityType : Class<*> = entityPath.annotatedElement as Class<*>
     val alias = entityPath.metadata.name
     return this.from(entityType, alias)
@@ -236,7 +253,7 @@ fun <A : RestrictionBuilder<T>, T> A.notBetweenExpression(expression: Expression
     return this.notBetweenExpression(jpqlQueryFragment)
 }
 
-private fun  <A : CriteriaBuilder<T>, T> A.setParameters(parameters : Map<String, Any>) : A {
+private fun  <A : ParameterHolder<*>> A.setParameters(parameters : Map<String, Any>) : A {
     for ((parameterName, constant) in parameters) {
         setParameter(parameterName, constant)
     }
@@ -250,8 +267,9 @@ private fun parseJPQLExpression(expression: Expression<*>): String {
     return ser.toString()
 }
 
-private fun CriteriaBuilder<*>.parseExpressionAndBindParameters(expression : Expression<*>) : Pair<String, HashMap<String, Any>> {
-    val ser = JPQLSerializer(JPQLTemplates.DEFAULT, this.entityManager)
+private fun Any.parseExpressionAndBindParameters(expression : Expression<*>) : Pair<String, HashMap<String, Any>> {
+    val em = if (this is QueryBuilder<*,*>) this.getEntityManager() else null
+    val ser = JPQLSerializer(JPQLTemplates.DEFAULT, em)
     expression.accept(ser, null)
     var jpqlQueryFragment = ser.toString()
 
