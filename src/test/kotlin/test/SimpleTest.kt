@@ -42,7 +42,8 @@ class SimpleTest : BaseCoreFunctionalTestCase() {
 
             cbf!!.create(entityManager, Tuple::class)
                 .from(person)
-                .innerJoin(person.documents, ownedDocument)
+                .innerJoinOn(person.documents, ownedDocument)
+                    .on(ownedDocument.numPages.eq(5))
                 .select(person.id, "pid")
                 .select(ownedDocument.numPages.sum())
                 .resultList

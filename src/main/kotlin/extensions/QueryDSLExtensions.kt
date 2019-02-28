@@ -1,9 +1,6 @@
 package extensions
 
 import com.blazebit.persistence.*
-import com.blazebit.persistence.impl.AbstractCommonQueryBuilder
-import com.blazebit.persistence.impl.ClauseType
-import com.blazebit.persistence.impl.parameterManager
 import com.mysema.query.jpa.JPQLSerializer
 import com.mysema.query.jpa.JPQLTemplates
 import com.mysema.query.types.*
@@ -18,29 +15,65 @@ fun <T : Any> CriteriaBuilderFactory.create(entityManager : EntityManager, entit
 
 fun <T, P> CriteriaBuilder<T>.innerJoin(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): CriteriaBuilder<T> {
     val alias = entityPath.metadata.name
-    return innerJoin(parseExpressionAndBindParameters(collectionPath, this), alias)
+    val (expression, parameters) = parseExpressionAndBindParameters(collectionPath)
+    return innerJoin(expression, alias).setParameters(parameters)
+}
+
+
+fun <T, P> CriteriaBuilder<T>.innerJoinOn(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): JoinOnBuilder<CriteriaBuilder<T>> {
+    val alias = entityPath.metadata.name
+    val (expression, parameters) = parseExpressionAndBindParameters(collectionPath)
+    return innerJoinOn(expression, alias)
+}
+
+fun <T : CriteriaBuilder<*>> JoinOnBuilder<T>.on(predicate: Predicate) : T {
+    val ser = JPQLSerializer(JPQLTemplates.DEFAULT)
+    predicate.accept(ser, null)
+    var jpqlQueryFragment = ser.toString()
+
+
+    val parameterNames = ser.constantToLabel.values.map { it to "qsl_param_${Counter.getCount()}" }.toMap()
+    for ((label, parameterName) in parameterNames) {
+        jpqlQueryFragment = jpqlQueryFragment.replace("?$label", ":$parameterName")
+    }
+
+    val result = this.setOnExpression(jpqlQueryFragment)
+
+    for ((constant, label) in ser.constantToLabel) {
+        result.setParameter(parameterNames[label], constant)
+    }
+
+    return result
+}
+
+fun <T, P> CriteriaBuilder<T>.leftJoin(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): CriteriaBuilder<T> {
+    val alias = entityPath.metadata.name
+    val (expression, parameters) = parseExpressionAndBindParameters(collectionPath)
+    return leftJoin(expression, alias).setParameters(parameters)
 }
 
 fun <T> CriteriaBuilder<T>.select(expression: Expression<*>): CriteriaBuilder<T> {
-    return select(parseExpressionAndBindParameters(expression, this))
+    val (expr, parameters) = parseExpressionAndBindParameters(expression)
+    return select(expr).setParameters(parameters)
 }
 
 fun <T> CriteriaBuilder<T>.select(expression: Expression<*>, alias: String): CriteriaBuilder<T> {
-    return select(parseExpressionAndBindParameters(expression, this), alias)
+    val (expr, parameters) = parseExpressionAndBindParameters(expression)
+    return select(expr, alias).setParameters(parameters)
+}
+
+private fun  <A : CriteriaBuilder<T>, T> A.setParameters(parameters : Map<String, Any>) : A {
+    for ((parameterName, constant) in parameters) {
+        setParameter(parameterName, constant)
+    }
+    return this
 }
 
 
 fun <A : CriteriaBuilder<T>, T> A.where(predicate : Predicate) : CriteriaBuilder<T> {
-    val jpqlQueryFragment = parseExpressionAndBindParameters(predicate, this)
-    return setWhereExpression(jpqlQueryFragment)
+    val (jpqlQueryFragment, parameters) = parseExpressionAndBindParameters(predicate)
+    return setWhereExpression(jpqlQueryFragment).setParameters(parameters)
 }
-
-// TODO: temporary need CB specific hooks
-//fun <A : WhereBuilder<A>> A.where(predicate : Predicate) : A {
-//    val ser : JPQLSerializer = JPQLSerializer(JPQLTemplates.DEFAULT)
-//    predicate.accept(ser, null)
-//    return this.setWhereExpression(ser.toString())
-//}
 
 fun <T> CriteriaBuilder<T>.from(entityPath : EntityPath<*>) : CriteriaBuilder<T> {
     val entityType : Class<*> = entityPath.annotatedElement as Class<*>
@@ -48,28 +81,19 @@ fun <T> CriteriaBuilder<T>.from(entityPath : EntityPath<*>) : CriteriaBuilder<T>
     return this.from(entityType, alias)
 }
 
-
-private fun parseExpressionAndBindParameters(expression : Expression<*>, builder : CriteriaBuilder<*>) : String {
-    val ser = JPQLSerializer(JPQLTemplates.DEFAULT)
+private fun CriteriaBuilder<*>.parseExpressionAndBindParameters(expression : Expression<*>) : Pair<String, HashMap<String, Any>> {
+    val ser = JPQLSerializer(JPQLTemplates.DEFAULT, this.entityManager)
     expression.accept(ser, null)
     var jpqlQueryFragment = ser.toString()
 
-    // TODO UGLYY
-    /**
-     * This is just a quick proof of concept.
-     * In all reality, we probably need to convert the QueryDSL AST to Blaze-Persist AST.
-     * This may require some additional methods in the CriteriaBuilder API.
-     */
-    val parameterManager = builder.parameterManager()
-
-    ser.getConstantToLabel().forEach{ (constant, param) ->
-        run {
-            val parameter = parameterManager.addParameterExpression(constant, ClauseType.WHERE, builder as AbstractCommonQueryBuilder<*, *, *, *, *>)
-            jpqlQueryFragment = jpqlQueryFragment.replace("?$param", ":${parameter.name}")
-        }
+    val parameters = HashMap<String, Any>()
+    for ((constant, label) in ser.constantToLabel) {
+        val parameterName = "qsl_param_${Counter.getCount()}"
+        parameters[parameterName] = constant
+        jpqlQueryFragment = jpqlQueryFragment.replace("?$label", ":$parameterName")
     }
 
-    return jpqlQueryFragment
+    return Pair(jpqlQueryFragment, parameters)
 }
 
 
