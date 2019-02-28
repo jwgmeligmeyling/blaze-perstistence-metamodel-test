@@ -19,11 +19,34 @@ fun <T, P> CriteriaBuilder<T>.innerJoin(collectionPath : CollectionExpression<*,
     return innerJoin(expression, alias).setParameters(parameters)
 }
 
+fun <T, P> CriteriaBuilder<T>.leftJoin(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): CriteriaBuilder<T> {
+    val alias = entityPath.metadata.name
+    val (expression, parameters) = parseExpressionAndBindParameters(collectionPath)
+    return leftJoin(expression, alias).setParameters(parameters)
+}
+
+fun <T, P> CriteriaBuilder<T>.rightJoin(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): CriteriaBuilder<T> {
+    val alias = entityPath.metadata.name
+    val (expression, parameters) = parseExpressionAndBindParameters(collectionPath)
+    return leftJoin(expression, alias).setParameters(parameters)
+}
 
 fun <T, P> CriteriaBuilder<T>.innerJoinOn(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): JoinOnBuilder<CriteriaBuilder<T>> {
     val alias = entityPath.metadata.name
-    val (expression, parameters) = parseExpressionAndBindParameters(collectionPath)
+    val (expression) = parseExpressionAndBindParameters(collectionPath)
     return innerJoinOn(expression, alias)
+}
+
+fun <T, P> CriteriaBuilder<T>.leftJoinOn(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): JoinOnBuilder<CriteriaBuilder<T>> {
+    val alias = entityPath.metadata.name
+    val (expression) = parseExpressionAndBindParameters(collectionPath)
+    return leftJoinOn(expression, alias)
+}
+
+fun <T, P> CriteriaBuilder<T>.rightJoinOn(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): JoinOnBuilder<CriteriaBuilder<T>> {
+    val alias = entityPath.metadata.name
+    val (expression) = parseExpressionAndBindParameters(collectionPath)
+    return leftJoinOn(expression, alias)
 }
 
 fun <T : CriteriaBuilder<*>> JoinOnBuilder<T>.on(predicate: Predicate) : T {
@@ -46,12 +69,6 @@ fun <T : CriteriaBuilder<*>> JoinOnBuilder<T>.on(predicate: Predicate) : T {
     return result
 }
 
-fun <T, P> CriteriaBuilder<T>.leftJoin(collectionPath : CollectionExpression<*, P>, entityPath : Path<P>): CriteriaBuilder<T> {
-    val alias = entityPath.metadata.name
-    val (expression, parameters) = parseExpressionAndBindParameters(collectionPath)
-    return leftJoin(expression, alias).setParameters(parameters)
-}
-
 fun <T> CriteriaBuilder<T>.select(expression: Expression<*>): CriteriaBuilder<T> {
     val (expr, parameters) = parseExpressionAndBindParameters(expression)
     return select(expr).setParameters(parameters)
@@ -68,7 +85,6 @@ private fun  <A : CriteriaBuilder<T>, T> A.setParameters(parameters : Map<String
     }
     return this
 }
-
 
 fun <A : CriteriaBuilder<T>, T> A.where(predicate : Predicate) : CriteriaBuilder<T> {
     val (jpqlQueryFragment, parameters) = parseExpressionAndBindParameters(predicate)
@@ -97,12 +113,19 @@ private fun CriteriaBuilder<*>.parseExpressionAndBindParameters(expression : Exp
 }
 
 
-fun <A : WhereBuilder<A>> A.where(path: Path<*>) : RestrictionBuilder<A> {
+fun <A : BaseWhereBuilder<A>> A.where(path: Path<*>) : RestrictionBuilder<A> {
     return this.where(getPathExpression(path))
 }
 
-fun <A : RestrictionBuilder<A>> A.eqExpression(path: Path<*>) : A {
+fun <A : RestrictionBuilder<T>, T> A.eqExpression(path: Path<*>) : T {
     return this.eqExpression(getPathExpression(path))
+}
+
+fun <A : RestrictionBuilder<T>, T> A.eqExpression(expression: Expression<*>) : T {
+    val ser = JPQLSerializer(JPQLTemplates.DEFAULT)
+    expression.accept(ser, null)
+    var jpqlQueryFragment = ser.toString()
+    return this.eqExpression(jpqlQueryFragment)
 }
 
 private fun getPathExpression(path : Path<*>) : String {

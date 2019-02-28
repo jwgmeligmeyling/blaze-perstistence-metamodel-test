@@ -50,6 +50,72 @@ class SimpleTest : BaseCoreFunctionalTestCase() {
         }
     }
 
+    @Test
+    fun doSomeMoreTest2() {
+        val result = doInJpa { entityManager ->
+
+            val ownedDocument = QDocument("ownedDocument")
+
+            cbf!!.create(entityManager, Tuple::class)
+                .from(person)
+                .innerJoin(person.documents, ownedDocument)
+                .select(person.id, "pid")
+                .select(ownedDocument.numPages.sum())
+                .resultList
+        }
+    }
+
+    @Test
+    fun doSomeMoreTest3() {
+        val result = doInJpa { entityManager ->
+
+            val ownedDocument = QDocument("ownedDocument")
+
+            cbf!!.create(entityManager, Tuple::class)
+                .from(person)
+                .leftJoin(person.documents, ownedDocument)
+                .select(person.id, "pid")
+                .select(ownedDocument.numPages.sum())
+                .resultList
+        }
+    }
+
+    @Test
+    fun doSomeMoreTest5() {
+        val result = doInJpa { entityManager ->
+
+            val ownedDocument = QDocument("ownedDocument")
+
+            cbf!!.create(entityManager, Tuple::class)
+                .from(person)
+                .leftJoin(person.documents, ownedDocument)
+                .where(person.name).eq("test")
+                .where(person.name).eqExpression(person.name.toUpperCase())
+                .select(person.id, "pid")
+                .select(ownedDocument.numPages.sum())
+                .resultList
+        }
+    }
+
+    @Test
+    fun doSomeMoreTest6() {
+        val result = doInJpa { entityManager ->
+
+            val ownedDocument = QDocument("ownedDocument")
+
+            cbf!!.create(entityManager, Tuple::class)
+                .from(person)
+                .leftJoin(person.documents, ownedDocument)
+                .whereOr()
+                    .where(person.name).eq("test")
+                    .where(person.name).eqExpression(person.name)
+                .endOr()
+                .select(person.id, "pid")
+                .select(ownedDocument.numPages.sum())
+                .resultList
+        }
+    }
+
 
 
     private fun <T> doInJpa(fn : (EntityManager) -> T) : T {
