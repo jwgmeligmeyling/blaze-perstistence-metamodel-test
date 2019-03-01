@@ -34,7 +34,6 @@ class SimpleTest : BaseCoreFunctionalTestCase() {
     @Test
     fun doSomeMoreTest() {
         val result = doInJpa { entityManager ->
-
             val ownedDocument = QDocument("ownedDocument")
 
             cbf!!.create(entityManager, Tuple::class)
@@ -43,6 +42,8 @@ class SimpleTest : BaseCoreFunctionalTestCase() {
                     .on(ownedDocument.numPages.eq(5))
                 .select(person.id, "pid")
                 .select(ownedDocument.numPages.sum())
+                .groupBy(person.id)
+                .orderByAsc(person.id.asc().nullsLast(), ownedDocument.numPages.sum().desc())
                 .resultList
         }
     }
@@ -108,7 +109,7 @@ class SimpleTest : BaseCoreFunctionalTestCase() {
                     .where(person.name).eqExpression(person.name)
                 .endOr()
                 .select(person.id, "pid")
-                .select(ownedDocument.numPages.sum())
+                .select(ownedDocument.numPages.sum().divide(2))
                 .resultList
         }
     }
